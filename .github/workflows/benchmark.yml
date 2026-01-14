@@ -25,12 +25,13 @@ on:
         type: string
 
 jobs:
-  # First job: determine the baseline tag
+  # Determine baseline tag and build the matrix
   setup:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       baseline_tag: ${{ steps.release.outputs.tag }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
       - name: Get latest opentelemetry-js release tag
         id: release
@@ -41,11 +42,26 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-  # Run baseline benchmark (latest release)
-  baseline:
+      - name: Build matrix
+        id: matrix
+        run: |
+          if [ "${{ inputs.apps }}" = "all" ]; then
+            APPS='["express", "fastify"]'
+          else
+            APPS='["${{ inputs.apps }}"]'
+          fi
+          MATRIX="{\"app\": $APPS, \"type\": [\"baseline\", \"pr\"]}"
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          echo "Matrix: $MATRIX"
+
+  # Run benchmarks in parallel (sharded by app and type)
+  benchmark:
     needs: setup
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
     steps:
       - name: Checkout performance experiments repo
         uses: actions/checkout@v4
@@ -55,7 +71,7 @@ jobs:
         with:
           repository: open-telemetry/opentelemetry-js
           path: opentelemetry-js
-          ref: ${{ needs.setup.outputs.baseline_tag }}
+          ref: ${{ matrix.type == 'baseline' && needs.setup.outputs.baseline_tag || format('refs/pull/{0}/head', inputs.pr_number) }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -72,75 +88,13 @@ jobs:
             turbo-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
             turbo-${{ runner.os }}-
 
-      - name: Install perf-experiments dependencies
-        run: npm ci
-
-      - name: Build perf-experiments
-        run: npm run build
-
-      - name: Install and build otel-js
+      - name: Get commit info
+        id: commit_info
         run: |
           cd opentelemetry-js
-          npm ci
-          npm run compile
-
-      - name: Run baseline benchmark
-        run: |
-          npm run cli -- run \
-            --app ${{ inputs.apps }} \
-            --scenario ${{ inputs.scenarios }} \
-            --preset ${{ inputs.preset }} \
-            --label "baseline-${{ needs.setup.outputs.baseline_tag }}" \
-            --otel-path ./opentelemetry-js \
-            --save
-
-      - name: Upload baseline results
-        uses: actions/upload-artifact@v4
-        with:
-          name: baseline-results
-          path: results/
-          retention-days: 1
-
-  # Run PR benchmark (in parallel with baseline)
-  pr:
-    needs: setup
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    outputs:
-      pr_short: ${{ steps.pr_info.outputs.short }}
-    steps:
-      - name: Checkout performance experiments repo
-        uses: actions/checkout@v4
-
-      - name: Checkout opentelemetry-js repo
-        uses: actions/checkout@v4
-        with:
-          repository: open-telemetry/opentelemetry-js
-          path: opentelemetry-js
-          ref: refs/pull/${{ inputs.pr_number }}/head
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Cache Turborepo
-        uses: actions/cache@v4
-        with:
-          path: .turbo
-          key: turbo-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-${{ github.sha }}
-          restore-keys: |
-            turbo-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
-            turbo-${{ runner.os }}-
-
-      - name: Get PR commit info
-        id: pr_info
-        run: |
-          cd opentelemetry-js
-          PR_SHORT=$(git rev-parse --short HEAD)
-          echo "short=$PR_SHORT" >> $GITHUB_OUTPUT
-          echo "PR commit: $PR_SHORT"
+          COMMIT_SHORT=$(git rev-parse --short HEAD)
+          echo "short=$COMMIT_SHORT" >> $GITHUB_OUTPUT
+          echo "Commit: $COMMIT_SHORT"
 
       - name: Install perf-experiments dependencies
         run: npm ci
@@ -154,26 +108,27 @@ jobs:
           npm ci
           npm run compile
 
-      - name: Run PR benchmark
+      - name: Run benchmark
         run: |
+          LABEL="${{ matrix.type == 'baseline' && format('baseline-{0}', needs.setup.outputs.baseline_tag) || format('pr-{0}', inputs.pr_number) }}"
           npm run cli -- run \
-            --app ${{ inputs.apps }} \
+            --app ${{ matrix.app }} \
             --scenario ${{ inputs.scenarios }} \
             --preset ${{ inputs.preset }} \
-            --label "pr-${{ inputs.pr_number }}" \
+            --label "$LABEL" \
             --otel-path ./opentelemetry-js \
             --save
 
-      - name: Upload PR results
+      - name: Upload results
         uses: actions/upload-artifact@v4
         with:
-          name: pr-results
+          name: results-${{ matrix.type }}-${{ matrix.app }}
           path: results/
           retention-days: 1
 
-  # Compare results and create report (after both benchmarks complete)
+  # Compare results and create report
   compare:
-    needs: [setup, baseline, pr]
+    needs: [setup, benchmark]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -201,16 +156,10 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Download baseline results
+      - name: Download all results
         uses: actions/download-artifact@v4
         with:
-          name: baseline-results
-          path: results/
-
-      - name: Download PR results
-        uses: actions/download-artifact@v4
-        with:
-          name: pr-results
+          pattern: results-*
           path: results/
           merge-multiple: true
 
@@ -251,7 +200,7 @@ jobs:
           echo "## Benchmark Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Baseline**: ${{ needs.setup.outputs.baseline_tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "**PR**: #${{ inputs.pr_number }} (${{ needs.pr.outputs.pr_short }})" >> $GITHUB_STEP_SUMMARY
+          echo "**PR**: #${{ inputs.pr_number }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Results" >> $GITHUB_STEP_SUMMARY
           cat comparison.md >> $GITHUB_STEP_SUMMARY
