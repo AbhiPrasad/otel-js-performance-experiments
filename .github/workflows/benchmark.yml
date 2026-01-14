@@ -318,8 +318,11 @@ jobs:
 
       - name: Create GitHub Issue with results
         if: success()
+        continue-on-error: true
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Use OTEL_GITHUB_TOKEN (PAT with repo scope) for cross-repo issue creation
+          # Falls back to GITHUB_TOKEN which only works for same-repo issues
+          GITHUB_TOKEN: ${{ secrets.OTEL_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           npm run cli -- report \
             --baseline "baseline-${{ needs.setup.outputs.baseline_tag }}" \
