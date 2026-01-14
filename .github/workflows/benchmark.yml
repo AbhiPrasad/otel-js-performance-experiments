@@ -65,7 +65,8 @@ jobs:
             MODES=$(echo '${{ inputs.modes }}' | jq -R 'split(",") | map(gsub("^\\s+|\\s+$";""))')
           fi
 
-          MATRIX="{\"app\": $APPS, \"mode\": $MODES, \"type\": [\"baseline\", \"pr\"]}"
+          # Matrix without type - used by both benchmark jobs
+          MATRIX="{\"app\": $APPS, \"mode\": $MODES}"
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
           echo "Matrix: $MATRIX"
 
@@ -143,9 +144,9 @@ jobs:
             package-lock.json
           retention-days: 1
 
-  # Run benchmarks in parallel (sharded by app, mode, and type)
-  benchmark:
-    needs: [setup, build-baseline, build-pr]
+  # Run baseline benchmarks (starts as soon as build-baseline completes)
+  benchmark-baseline:
+    needs: [setup, build-baseline]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -179,31 +180,87 @@ jobs:
       - name: Download built otel-js
         uses: actions/download-artifact@v4
         with:
-          name: otel-js-${{ matrix.type }}
+          name: otel-js-baseline
           path: opentelemetry-js/
 
       - name: Run benchmark
         run: |
-          LABEL="${{ matrix.type == 'baseline' && format('baseline-{0}', needs.setup.outputs.baseline_tag) || format('pr-{0}', inputs.pr_number) }}"
           npm run cli -- run \
             --app ${{ matrix.app }} \
             --mode ${{ matrix.mode }} \
             --scenario ${{ inputs.scenarios }} \
             --preset ${{ inputs.preset }} \
-            --label "$LABEL" \
+            --label "baseline-${{ needs.setup.outputs.baseline_tag }}" \
             --otel-path ./opentelemetry-js \
             --save
 
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
-          name: results-${{ matrix.type }}-${{ matrix.app }}-${{ matrix.mode }}
+          name: results-baseline-${{ matrix.app }}-${{ matrix.mode }}
+          path: results/
+          retention-days: 1
+
+  # Run PR benchmarks (starts as soon as build-pr completes)
+  benchmark-pr:
+    needs: [setup, build-pr]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
+    steps:
+      - name: Checkout performance experiments repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Cache Turborepo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
+            turbo-${{ runner.os }}-
+
+      - name: Install perf-experiments dependencies
+        run: npm ci
+
+      - name: Build perf-experiments
+        run: npm run build
+
+      - name: Download built otel-js
+        uses: actions/download-artifact@v4
+        with:
+          name: otel-js-pr
+          path: opentelemetry-js/
+
+      - name: Run benchmark
+        run: |
+          npm run cli -- run \
+            --app ${{ matrix.app }} \
+            --mode ${{ matrix.mode }} \
+            --scenario ${{ inputs.scenarios }} \
+            --preset ${{ inputs.preset }} \
+            --label "pr-${{ inputs.pr_number }}" \
+            --otel-path ./opentelemetry-js \
+            --save
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-pr-${{ matrix.app }}-${{ matrix.mode }}
           path: results/
           retention-days: 1
 
   # Compare results and create report
   compare:
-    needs: [setup, benchmark]
+    needs: [setup, benchmark-baseline, benchmark-pr]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
