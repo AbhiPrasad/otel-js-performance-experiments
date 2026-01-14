@@ -1,0 +1,71 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+Performance testing framework for benchmarking OpenTelemetry JavaScript instrumentation. Tests Express and Fastify servers with various instrumentation modes using autocannon load testing and clinic.js profiling.
+
+## Common Commands
+
+```bash
+# Build all packages
+npm run build
+
+# Run linting
+npm run lint
+
+# Clean dist directories
+npm run clean
+
+# Run a benchmark
+npm run cli -- run --app express --preset quick --label "test" --save
+
+# Compare two benchmark results
+npm run cli -- compare --baseline <baseline-id> --target <target-id>
+
+# Export results (json, csv, markdown)
+npm run cli -- export --id <result-id> --format markdown --output report.md
+
+# List stored results
+npm run cli -- list
+
+# Test a PR against latest release (from opentelemetry-js repo)
+./scripts/test-pr.sh <pr-number> --app express --preset standard
+```
+
+## Architecture
+
+**Monorepo Structure** (npm workspaces):
+- `packages/cli` - CLI entry point, command handlers (run, compare, list, export, report)
+- `packages/benchmark-runner` - Autocannon load testing + clinic.js profiling integration
+- `packages/results-store` - JSON-based result storage, comparison logic, exporters
+- `packages/otel-linker` - Git operations, builds, and npm linking for opentelemetry-js packages
+- `packages/github-reporter` - GitHub issue creation with benchmark comparisons
+- `apps/express-app` - Express test server (port 3000)
+- `apps/fastify-app` - Fastify test server (port 3000)
+- `config/scenarios.ts` - Test scenarios, instrumentation modes, benchmark presets
+
+**Key Patterns**:
+- ESM modules throughout (use `.js` extensions in imports)
+- TypeScript with ES2022 target, NodeNext module resolution
+- Each package has `src/` compiled to `dist/`
+- Internal packages use `@otel-perf/` namespace
+
+## Test Configuration
+
+**Scenarios**: simple-json, async-io-50ms, async-io-100ms, cpu-work-light, cpu-work-heavy, external-http-single, nested-spans, post-json-small
+
+**Instrumentation Modes**:
+- `baseline` - No OTel instrumentation
+- `otel-noop` - NoopSpanProcessor (SDK overhead only)
+- `otel-console` - ConsoleSpanExporter
+- `otel-otlp-http` - OTLP HTTP exporter
+
+**Presets**: quick (10s), standard (30s), stress (60s), sustained (300s)
+
+## Environment Variables
+
+- `OTEL_JS_PATH` - Path to opentelemetry-js repo (default: ~/workspace/opentelemetry-js)
+- `GITHUB_TOKEN` - Required for GitHub issue creation
+- `MOCK_SERVER_PORT` - Mock server for external call tests (default: 3001)

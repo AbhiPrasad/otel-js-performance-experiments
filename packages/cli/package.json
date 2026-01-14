@@ -1,0 +1,25 @@
+{
+  "name": "@otel-perf/cli",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "CLI for OpenTelemetry performance benchmarking",
+  "main": "dist/index.js",
+  "bin": {
+    "otel-perf": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@otel-perf/benchmark-runner": "*",
+    "@otel-perf/otel-linker": "*",
+    "@otel-perf/results-store": "*",
+    "@otel-perf/github-reporter": "*",
+    "chalk": "^5.3.0",
+    "cli-table3": "^0.6.3",
+    "ora": "^8.0.0"
+  },
+  "devDependencies": {}
+}

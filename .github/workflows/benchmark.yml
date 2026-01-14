@@ -1,0 +1,160 @@
+name: Performance Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number from opentelemetry-js to benchmark'
+        required: true
+        type: string
+      scenarios:
+        description: 'Test scenarios (comma-separated or "all")'
+        required: false
+        default: 'simple-json'
+        type: string
+      apps:
+        description: 'Applications to test (express, fastify, or all)'
+        required: false
+        default: 'express'
+        type: string
+      preset:
+        description: 'Benchmark preset (quick, standard, stress)'
+        required: false
+        default: 'standard'
+        type: string
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout performance experiments repo
+        uses: actions/checkout@v4
+
+      - name: Checkout opentelemetry-js repo
+        uses: actions/checkout@v4
+        with:
+          repository: open-telemetry/opentelemetry-js
+          path: opentelemetry-js
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Find latest release tag
+        id: release
+        run: |
+          cd opentelemetry-js
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "main")
+          LATEST_COMMIT=$(git rev-parse HEAD)
+          echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          echo "commit=$LATEST_COMMIT" >> $GITHUB_OUTPUT
+          echo "Latest release: $LATEST_TAG ($LATEST_COMMIT)"
+
+      - name: Install perf-experiments dependencies
+        run: npm ci
+
+      - name: Build perf-experiments
+        run: npm run build
+
+      # === Baseline Benchmark ===
+      - name: Checkout baseline (latest release)
+        run: |
+          cd opentelemetry-js
+          git checkout ${{ steps.release.outputs.tag }}
+
+      - name: Install and build baseline otel-js
+        run: |
+          cd opentelemetry-js
+          npm ci
+          npm run compile
+
+      - name: Run baseline benchmark
+        run: |
+          npm run cli -- run \
+            --app ${{ inputs.apps }} \
+            --scenario ${{ inputs.scenarios }} \
+            --preset ${{ inputs.preset }} \
+            --label "baseline-${{ steps.release.outputs.tag }}" \
+            --otel-path ./opentelemetry-js \
+            --save
+
+      # === PR Benchmark ===
+      - name: Fetch and checkout PR
+        run: |
+          cd opentelemetry-js
+          git fetch origin pull/${{ inputs.pr_number }}/head:pr-${{ inputs.pr_number }}
+          git checkout pr-${{ inputs.pr_number }}
+
+      - name: Get PR commit info
+        id: pr_info
+        run: |
+          cd opentelemetry-js
+          PR_COMMIT=$(git rev-parse HEAD)
+          PR_SHORT=$(git rev-parse --short HEAD)
+          echo "commit=$PR_COMMIT" >> $GITHUB_OUTPUT
+          echo "short=$PR_SHORT" >> $GITHUB_OUTPUT
+          echo "PR commit: $PR_SHORT"
+
+      - name: Install and build PR otel-js
+        run: |
+          cd opentelemetry-js
+          npm ci
+          npm run compile
+
+      - name: Run PR benchmark
+        run: |
+          npm run cli -- run \
+            --app ${{ inputs.apps }} \
+            --scenario ${{ inputs.scenarios }} \
+            --preset ${{ inputs.preset }} \
+            --label "pr-${{ inputs.pr_number }}" \
+            --otel-path ./opentelemetry-js \
+            --save
+
+      # === Generate Report ===
+      - name: Compare results
+        id: compare
+        run: |
+          npm run cli -- compare \
+            --baseline "baseline-${{ steps.release.outputs.tag }}" \
+            --target "pr-${{ inputs.pr_number }}" \
+            --format markdown > comparison.md
+          cat comparison.md
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-pr-${{ inputs.pr_number }}
+          path: |
+            results/
+            comparison.md
+          retention-days: 90
+
+      - name: Create GitHub Issue with results
+        if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm run cli -- report \
+            --baseline "baseline-${{ steps.release.outputs.tag }}" \
+            --target "pr-${{ inputs.pr_number }}" \
+            --create-issue \
+            --pr ${{ inputs.pr_number }} \
+            --artifact-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --owner "open-telemetry" \
+            --repo "opentelemetry-js"
+
+      - name: Print summary
+        run: |
+          echo "## Benchmark Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Baseline**: ${{ steps.release.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "**PR**: #${{ inputs.pr_number }} (${{ steps.pr_info.outputs.short }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Results" >> $GITHUB_STEP_SUMMARY
+          cat comparison.md >> $GITHUB_STEP_SUMMARY

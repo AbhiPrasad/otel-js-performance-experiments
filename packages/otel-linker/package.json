@@ -1,0 +1,20 @@
+{
+  "name": "@otel-perf/otel-linker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Git operations, build management, and package linking for opentelemetry-js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {}
+}

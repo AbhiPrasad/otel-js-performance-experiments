@@ -1,0 +1,23 @@
+{
+  "name": "@otel-perf/github-reporter",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "GitHub issue creation for benchmark results",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@octokit/rest": "^20.0.0",
+    "@otel-perf/results-store": "*"
+  }
+}

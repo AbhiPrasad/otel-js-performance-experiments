@@ -1,0 +1,25 @@
+{
+  "name": "@otel-perf/benchmark-runner",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Benchmark runner with autocannon and clinic.js integration",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "autocannon": "^8.0.0"
+  },
+  "devDependencies": {
+    "@types/autocannon": "^7.12.0"
+  }
+}
