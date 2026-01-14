@@ -1,4 +1,5 @@
 name: Performance Benchmark
+run-name: "Benchmark PR #${{ inputs.pr_number }} (${{ inputs.preset }})"
 
 on:
   workflow_dispatch:
