@@ -30,6 +30,9 @@ npm run cli -- export --id <result-id> --format markdown --output report.md
 # List stored results
 npm run cli -- list
 
+# Rebuild results index (after merging artifacts)
+npm run cli -- rebuild-index
+
 # Test a PR against latest release (from opentelemetry-js repo)
 ./scripts/test-pr.sh <pr-number> --app express --preset standard
 ```
@@ -62,9 +65,11 @@ npm run cli -- list
 
 **Benchmark Workflow** (`.github/workflows/benchmark.yml`):
 - Manually triggered via `workflow_dispatch`
-- Parallelized: baseline and PR benchmarks run simultaneously on separate runners
-- Jobs: `setup` → `baseline` + `pr` (parallel) → `compare`
-- Shares Turborepo cache with CI workflow
+- Jobs: `setup` → `build-baseline` + `build-pr` → `benchmark-baseline` + `benchmark-pr` → `compare`
+- otel-js built once per version, uploaded as artifact
+- Benchmarks sharded by app × mode matrix
+- Baseline benchmarks start immediately when baseline build completes (don't wait for PR build)
+- `rebuild-index` CLI command merges results from parallel artifact uploads
 
 ## Test Configuration
 

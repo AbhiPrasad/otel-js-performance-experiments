@@ -107,20 +107,26 @@ Manually trigger the benchmark workflow:
 3. Enter the PR number and configure options:
    - **scenarios**: Test scenarios (comma-separated or "all")
    - **apps**: express, fastify, or all
+   - **modes**: Instrumentation modes (baseline, otel-noop, otel-console, otel-otlp-http, or all)
    - **preset**: quick, standard, or stress
 4. Monitor the workflow
 
-The workflow runs in parallel for faster results:
+The workflow is optimized for parallelism and efficiency:
 
 ```
-setup          →  Get latest release tag
-                     ↓
-baseline + pr  →  Run benchmarks in PARALLEL on separate runners
-                     ↓
-compare        →  Merge results, generate report, create GitHub issue
+setup                     Get latest release tag, build matrix
+  ↓
+build-baseline ─────────→ benchmark-baseline (N parallel jobs) ──┐
+build-pr ───────────────→ benchmark-pr (N parallel jobs) ────────┼→ compare
 ```
 
-Outputs:
+**Key optimizations:**
+- **Parallel builds**: Baseline and PR versions of otel-js build simultaneously
+- **Shared artifacts**: otel-js built once per version, shared with benchmark jobs
+- **Matrix sharding**: Benchmarks sharded by app × mode (up to 8 parallel jobs per version)
+- **Decoupled dependencies**: Baseline benchmarks start as soon as baseline build completes
+
+**Outputs:**
 - GitHub issue with comparison results
 - Benchmark artifacts (retained 90 days)
 - Job summary with markdown report
