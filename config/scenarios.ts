@@ -78,6 +78,12 @@ export const SCENARIOS: TestScenario[] = [
     method: 'GET',
   },
   {
+    name: 'complex-attributes',
+    description: 'Spans with complex attributes (arrays, nested objects) for toAnyValue benchmarking',
+    endpoint: '/api/spans/complex-attributes',
+    method: 'GET',
+  },
+  {
     name: 'post-json-small',
     description: 'POST with small JSON body',
     endpoint: '/api/data',
