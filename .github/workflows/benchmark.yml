@@ -24,10 +24,27 @@ on:
         type: string
 
 jobs:
-  benchmark:
+  # First job: determine the baseline tag
+  setup:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 5
+    outputs:
+      baseline_tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - name: Get latest opentelemetry-js release tag
+        id: release
+        run: |
+          LATEST_TAG=$(gh api repos/open-telemetry/opentelemetry-js/releases/latest --jq '.tag_name' 2>/dev/null || echo "main")
+          echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          echo "Latest release: $LATEST_TAG"
+        env:
+          GH_TOKEN: ${{ github.token }}
 
+  # Run baseline benchmark (latest release)
+  baseline:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout performance experiments repo
         uses: actions/checkout@v4
@@ -37,7 +54,7 @@ jobs:
         with:
           repository: open-telemetry/opentelemetry-js
           path: opentelemetry-js
-          fetch-depth: 0
+          ref: ${{ needs.setup.outputs.baseline_tag }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -54,29 +71,13 @@ jobs:
             turbo-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
             turbo-${{ runner.os }}-
 
-      - name: Find latest release tag
-        id: release
-        run: |
-          cd opentelemetry-js
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "main")
-          LATEST_COMMIT=$(git rev-parse HEAD)
-          echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
-          echo "commit=$LATEST_COMMIT" >> $GITHUB_OUTPUT
-          echo "Latest release: $LATEST_TAG ($LATEST_COMMIT)"
-
       - name: Install perf-experiments dependencies
         run: npm ci
 
       - name: Build perf-experiments
         run: npm run build
 
-      # === Baseline Benchmark ===
-      - name: Checkout baseline (latest release)
-        run: |
-          cd opentelemetry-js
-          git checkout ${{ steps.release.outputs.tag }}
-
-      - name: Install and build baseline otel-js
+      - name: Install and build otel-js
         run: |
           cd opentelemetry-js
           npm ci
@@ -88,28 +89,65 @@ jobs:
             --app ${{ inputs.apps }} \
             --scenario ${{ inputs.scenarios }} \
             --preset ${{ inputs.preset }} \
-            --label "baseline-${{ steps.release.outputs.tag }}" \
+            --label "baseline-${{ needs.setup.outputs.baseline_tag }}" \
             --otel-path ./opentelemetry-js \
             --save
 
-      # === PR Benchmark ===
-      - name: Fetch and checkout PR
-        run: |
-          cd opentelemetry-js
-          git fetch origin pull/${{ inputs.pr_number }}/head:pr-${{ inputs.pr_number }}
-          git checkout pr-${{ inputs.pr_number }}
+      - name: Upload baseline results
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseline-results
+          path: results/
+          retention-days: 1
+
+  # Run PR benchmark (in parallel with baseline)
+  pr:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      pr_short: ${{ steps.pr_info.outputs.short }}
+    steps:
+      - name: Checkout performance experiments repo
+        uses: actions/checkout@v4
+
+      - name: Checkout opentelemetry-js repo
+        uses: actions/checkout@v4
+        with:
+          repository: open-telemetry/opentelemetry-js
+          path: opentelemetry-js
+          ref: refs/pull/${{ inputs.pr_number }}/head
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Cache Turborepo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
+            turbo-${{ runner.os }}-
 
       - name: Get PR commit info
         id: pr_info
         run: |
           cd opentelemetry-js
-          PR_COMMIT=$(git rev-parse HEAD)
           PR_SHORT=$(git rev-parse --short HEAD)
-          echo "commit=$PR_COMMIT" >> $GITHUB_OUTPUT
           echo "short=$PR_SHORT" >> $GITHUB_OUTPUT
           echo "PR commit: $PR_SHORT"
 
-      - name: Install and build PR otel-js
+      - name: Install perf-experiments dependencies
+        run: npm ci
+
+      - name: Build perf-experiments
+        run: npm run build
+
+      - name: Install and build otel-js
         run: |
           cd opentelemetry-js
           npm ci
@@ -125,12 +163,61 @@ jobs:
             --otel-path ./opentelemetry-js \
             --save
 
-      # === Generate Report ===
+      - name: Upload PR results
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-results
+          path: results/
+          retention-days: 1
+
+  # Compare results and create report (after both benchmarks complete)
+  compare:
+    needs: [setup, baseline, pr]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout performance experiments repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Cache Turborepo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
+            turbo-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Download baseline results
+        uses: actions/download-artifact@v4
+        with:
+          name: baseline-results
+          path: results/
+
+      - name: Download PR results
+        uses: actions/download-artifact@v4
+        with:
+          name: pr-results
+          path: results/
+          merge-multiple: true
+
       - name: Compare results
         id: compare
         run: |
           npm run cli -- compare \
-            --baseline "baseline-${{ steps.release.outputs.tag }}" \
+            --baseline "baseline-${{ needs.setup.outputs.baseline_tag }}" \
             --target "pr-${{ inputs.pr_number }}" \
             --format markdown > comparison.md
           cat comparison.md
@@ -150,7 +237,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           npm run cli -- report \
-            --baseline "baseline-${{ steps.release.outputs.tag }}" \
+            --baseline "baseline-${{ needs.setup.outputs.baseline_tag }}" \
             --target "pr-${{ inputs.pr_number }}" \
             --create-issue \
             --pr ${{ inputs.pr_number }} \
@@ -162,8 +249,8 @@ jobs:
         run: |
           echo "## Benchmark Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Baseline**: ${{ steps.release.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "**PR**: #${{ inputs.pr_number }} (${{ steps.pr_info.outputs.short }})" >> $GITHUB_STEP_SUMMARY
+          echo "**Baseline**: ${{ needs.setup.outputs.baseline_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "**PR**: #${{ inputs.pr_number }} (${{ needs.pr.outputs.pr_short }})" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Results" >> $GITHUB_STEP_SUMMARY
           cat comparison.md >> $GITHUB_STEP_SUMMARY
