@@ -18,6 +18,11 @@ on:
         required: false
         default: 'express'
         type: string
+      modes:
+        description: 'Instrumentation modes (baseline, otel-noop, otel-console, otel-otlp-http, or all)'
+        required: false
+        default: 'baseline,otel-noop'
+        type: string
       preset:
         description: 'Benchmark preset (quick, standard, stress)'
         required: false
@@ -45,16 +50,26 @@ jobs:
       - name: Build matrix
         id: matrix
         run: |
+          # Build apps array
           if [ "${{ inputs.apps }}" = "all" ]; then
             APPS='["express", "fastify"]'
           else
             APPS='["${{ inputs.apps }}"]'
           fi
-          MATRIX="{\"app\": $APPS, \"type\": [\"baseline\", \"pr\"]}"
+
+          # Build modes array
+          if [ "${{ inputs.modes }}" = "all" ]; then
+            MODES='["baseline", "otel-noop", "otel-console", "otel-otlp-http"]'
+          else
+            # Convert comma-separated to JSON array
+            MODES=$(echo '${{ inputs.modes }}' | jq -R 'split(",") | map(gsub("^\\s+|\\s+$";""))')
+          fi
+
+          MATRIX="{\"app\": $APPS, \"mode\": $MODES, \"type\": [\"baseline\", \"pr\"]}"
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
           echo "Matrix: $MATRIX"
 
-  # Run benchmarks in parallel (sharded by app and type)
+  # Run benchmarks in parallel (sharded by app, mode, and type)
   benchmark:
     needs: setup
     runs-on: ubuntu-latest
@@ -113,6 +128,7 @@ jobs:
           LABEL="${{ matrix.type == 'baseline' && format('baseline-{0}', needs.setup.outputs.baseline_tag) || format('pr-{0}', inputs.pr_number) }}"
           npm run cli -- run \
             --app ${{ matrix.app }} \
+            --mode ${{ matrix.mode }} \
             --scenario ${{ inputs.scenarios }} \
             --preset ${{ inputs.preset }} \
             --label "$LABEL" \
@@ -122,7 +138,7 @@ jobs:
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
-          name: results-${{ matrix.type }}-${{ matrix.app }}
+          name: results-${{ matrix.type }}-${{ matrix.app }}-${{ matrix.mode }}
           path: results/
           retention-days: 1
 
