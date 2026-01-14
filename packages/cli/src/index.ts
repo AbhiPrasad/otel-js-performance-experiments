@@ -5,6 +5,7 @@ import { compareCommand } from './commands/compare.js';
 import { listCommand } from './commands/list.js';
 import { exportCommand } from './commands/export.js';
 import { reportCommand } from './commands/report.js';
+import { rebuildIndexCommand } from './commands/rebuild-index.js';
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -17,11 +18,12 @@ Usage:
   otel-perf <command> [options]
 
 Commands:
-  run       Run benchmark suite
-  compare   Compare two benchmark results
-  list      List stored results
-  export    Export results to file
-  report    Create GitHub issue with results
+  run            Run benchmark suite
+  compare        Compare two benchmark results
+  list           List stored results
+  export         Export results to file
+  report         Create GitHub issue with results
+  rebuild-index  Rebuild index from benchmark files
 
 Run Options:
   --app <name>        Application to test (express, fastify, all) [default: all]
@@ -76,6 +78,9 @@ async function main() {
         break;
       case 'report':
         await reportCommand(args.slice(1));
+        break;
+      case 'rebuild-index':
+        await rebuildIndexCommand(args.slice(1));
         break;
       case 'help':
       case '--help':

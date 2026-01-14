@@ -164,6 +164,52 @@ export class ResultsStorage {
     return toDelete.length;
   }
 
+  async rebuildIndex(): Promise<number> {
+    const benchmarksDir = path.join(this.resultsDir, 'benchmarks');
+    const index: IndexEntry[] = [];
+
+    try {
+      const files = await fs.readdir(benchmarksDir);
+
+      for (const file of files) {
+        if (!file.endsWith('.json')) continue;
+
+        const filepath = path.join(benchmarksDir, file);
+        try {
+          const content = await fs.readFile(filepath, 'utf-8');
+          const benchmark: StoredBenchmark = JSON.parse(content);
+          const { metadata } = benchmark;
+
+          index.push({
+            id: metadata.id,
+            label: metadata.label,
+            timestamp: metadata.timestamp,
+            filepath,
+            app: metadata.config.app,
+            scenario: metadata.config.scenario,
+            mode: metadata.config.mode,
+            git: {
+              branch: metadata.git.branch,
+              commit: metadata.git.commit,
+              tag: metadata.git.tag,
+            },
+          });
+        } catch {
+          // Skip files that can't be parsed
+        }
+      }
+
+      // Sort by timestamp descending
+      index.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+      await this.saveIndex(index);
+
+      return index.length;
+    } catch {
+      // Directory might not exist
+      return 0;
+    }
+  }
+
   private captureEnvironment(): BenchmarkMetadata['environment'] {
     const cpus = os.cpus();
     return {
