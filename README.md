@@ -91,18 +91,39 @@ Use the provided script to test a PR against the latest release:
 
 ## GitHub Actions
 
+### CI Workflow
+
+Runs automatically on push to `main` and on pull requests:
+- Builds all packages using Turborepo
+- Runs linting
+- Caches dependencies and build outputs for faster subsequent runs
+
+### Benchmark Workflow
+
 Manually trigger the benchmark workflow:
 
 1. Go to Actions → "Performance Benchmark"
 2. Click "Run workflow"
-3. Enter the PR number
+3. Enter the PR number and configure options:
+   - **scenarios**: Test scenarios (comma-separated or "all")
+   - **apps**: express, fastify, or all
+   - **preset**: quick, standard, or stress
 4. Monitor the workflow
 
-The workflow will:
-- Benchmark the latest release as baseline
-- Benchmark the PR
-- Create a GitHub issue with comparison results
-- Upload benchmark artifacts
+The workflow runs in parallel for faster results:
+
+```
+setup          →  Get latest release tag
+                     ↓
+baseline + pr  →  Run benchmarks in PARALLEL on separate runners
+                     ↓
+compare        →  Merge results, generate report, create GitHub issue
+```
+
+Outputs:
+- GitHub issue with comparison results
+- Benchmark artifacts (retained 90 days)
+- Job summary with markdown report
 
 ## Project Structure
 
@@ -168,9 +189,17 @@ export GITHUB_TOKEN=your-token
 
 ## Development
 
+This project uses [Turborepo](https://turbo.build/) for build orchestration, which handles package dependency order and caches build outputs.
+
 ```bash
-# Build all packages
+# Build all packages (uses Turborepo)
 npm run build
+
+# Clean all dist directories
+npm run clean
+
+# Run linting
+npm run lint
 
 # Run CLI in development
 node packages/cli/dist/index.js run --help

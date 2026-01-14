@@ -51,6 +51,20 @@ npm run cli -- list
 - TypeScript with ES2022 target, NodeNext module resolution
 - Each package has `src/` compiled to `dist/`
 - Internal packages use `@otel-perf/` namespace
+- Turborepo manages build orchestration (respects package dependency order)
+
+## GitHub Actions
+
+**CI Workflow** (`.github/workflows/ci.yml`):
+- Runs on push to `main` and PRs
+- Builds all packages, runs lint
+- Caches npm dependencies and Turborepo build outputs
+
+**Benchmark Workflow** (`.github/workflows/benchmark.yml`):
+- Manually triggered via `workflow_dispatch`
+- Parallelized: baseline and PR benchmarks run simultaneously on separate runners
+- Jobs: `setup` → `baseline` + `pr` (parallel) → `compare`
+- Shares Turborepo cache with CI workflow
 
 ## Test Configuration
 
