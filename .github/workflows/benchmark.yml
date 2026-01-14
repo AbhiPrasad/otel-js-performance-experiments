@@ -69,24 +69,91 @@ jobs:
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
           echo "Matrix: $MATRIX"
 
-  # Run benchmarks in parallel (sharded by app, mode, and type)
-  benchmark:
+  # Build baseline otel-js (latest release)
+  build-baseline:
     needs: setup
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
+    steps:
+      - name: Checkout opentelemetry-js repo
+        uses: actions/checkout@v4
+        with:
+          repository: open-telemetry/opentelemetry-js
+          ref: ${{ needs.setup.outputs.baseline_tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install and build otel-js
+        run: |
+          npm ci
+          npm run compile
+
+      - name: Upload built otel-js
+        uses: actions/upload-artifact@v4
+        with:
+          name: otel-js-baseline
+          path: |
+            packages/*/build/
+            packages/*/dist/
+            experimental/packages/*/build/
+            experimental/packages/*/dist/
+            node_modules/
+            package.json
+            package-lock.json
+          retention-days: 1
+
+  # Build PR otel-js
+  build-pr:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout opentelemetry-js repo
+        uses: actions/checkout@v4
+        with:
+          repository: open-telemetry/opentelemetry-js
+          ref: refs/pull/${{ inputs.pr_number }}/head
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install and build otel-js
+        run: |
+          npm ci
+          npm run compile
+
+      - name: Upload built otel-js
+        uses: actions/upload-artifact@v4
+        with:
+          name: otel-js-pr
+          path: |
+            packages/*/build/
+            packages/*/dist/
+            experimental/packages/*/build/
+            experimental/packages/*/dist/
+            node_modules/
+            package.json
+            package-lock.json
+          retention-days: 1
+
+  # Run benchmarks in parallel (sharded by app, mode, and type)
+  benchmark:
+    needs: [setup, build-baseline, build-pr]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
     steps:
       - name: Checkout performance experiments repo
         uses: actions/checkout@v4
-
-      - name: Checkout opentelemetry-js repo
-        uses: actions/checkout@v4
-        with:
-          repository: open-telemetry/opentelemetry-js
-          path: opentelemetry-js
-          ref: ${{ matrix.type == 'baseline' && needs.setup.outputs.baseline_tag || format('refs/pull/{0}/head', inputs.pr_number) }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -103,25 +170,17 @@ jobs:
             turbo-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
             turbo-${{ runner.os }}-
 
-      - name: Get commit info
-        id: commit_info
-        run: |
-          cd opentelemetry-js
-          COMMIT_SHORT=$(git rev-parse --short HEAD)
-          echo "short=$COMMIT_SHORT" >> $GITHUB_OUTPUT
-          echo "Commit: $COMMIT_SHORT"
-
       - name: Install perf-experiments dependencies
         run: npm ci
 
       - name: Build perf-experiments
         run: npm run build
 
-      - name: Install and build otel-js
-        run: |
-          cd opentelemetry-js
-          npm ci
-          npm run compile
+      - name: Download built otel-js
+        uses: actions/download-artifact@v4
+        with:
+          name: otel-js-${{ matrix.type }}
+          path: opentelemetry-js/
 
       - name: Run benchmark
         run: |
