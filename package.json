@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Performance testing project for OpenTelemetry JavaScript",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=24.0.0"
   },
   "packageManager": "npm@10.8.0",
   "workspaces": [
