@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Performance testing framework for benchmarking OpenTelemetry JavaScript instrumentation. Tests Express and Fastify servers with various instrumentation modes using autocannon load testing and clinic.js profiling.
 
+**Requirements**: Node.js 24+
+
 ## Common Commands
 
 ```bash
@@ -73,7 +75,7 @@ npm run cli -- rebuild-index
 
 ## Test Configuration
 
-**Scenarios**: simple-json, async-io-50ms, async-io-100ms, cpu-work-light, cpu-work-heavy, external-http-single, nested-spans, post-json-small
+**Scenarios**: simple-json, async-io-50ms, async-io-100ms, cpu-work-light, cpu-work-heavy, external-http-single, nested-spans, complex-attributes, post-json-small
 
 **Instrumentation Modes**:
 - `baseline` - No OTel instrumentation

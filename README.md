@@ -13,7 +13,7 @@ A comprehensive performance testing project for benchmarking OpenTelemetry JavaS
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 24+
 - opentelemetry-js repo cloned locally (default: `~/workspace/opentelemetry-js`)
 
 ## Quick Start
@@ -162,6 +162,7 @@ otel-js-performance-experiments/
 | `cpu-work-light` | Light CPU-bound work |
 | `external-http-*` | External HTTP calls |
 | `nested-spans` | Manual nested spans |
+| `complex-attributes` | Spans with complex attributes (arrays, nested objects) |
 
 ## Instrumentation Modes
 
