@@ -14,7 +14,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "vitest run src/*.test.ts"
   },
   "dependencies": {
     "uuid": "^9.0.0"

@@ -208,6 +208,37 @@ npm run clean
 # Run linting
 npm run lint
 
+# Run tests
+npm run test
+
 # Run CLI in development
 node packages/cli/dist/index.js run --help
 ```
+
+## Testing
+
+The project uses [Vitest](https://vitest.dev/) for unit testing. Tests are located alongside source files with `.test.ts` extensions.
+
+### Running Tests
+
+```bash
+# Run all tests
+npm run test
+
+# Run tests for a specific package
+cd packages/results-store && npm test
+cd packages/cli && npm test
+```
+
+### Test Coverage
+
+Tests cover core functionality:
+
+- **results-store**: Storage operations (save, load, delete, rebuild index), comparison calculations (`calculateDiff`), formatting utilities
+- **cli**: Argument parsing, path expansion, duration formatting
+
+### Adding Tests
+
+1. Create test files alongside source files with `.test.ts` extension
+2. Import from `vitest` (`describe`, `it`, `expect`, etc.)
+3. Run tests with `npm run test`

@@ -10,7 +10,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "vitest run src/*.test.ts"
   },
   "dependencies": {
     "@otel-perf/benchmark-runner": "*",
