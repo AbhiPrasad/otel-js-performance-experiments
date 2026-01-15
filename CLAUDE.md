@@ -17,6 +17,9 @@ npm run build
 # Run linting
 npm run lint
 
+# Run tests
+npm run test
+
 # Clean dist directories
 npm run clean
 
@@ -84,6 +87,24 @@ npm run cli -- rebuild-index
 - `otel-otlp-http` - OTLP HTTP exporter
 
 **Presets**: quick (10s), standard (30s), stress (60s), sustained (300s)
+
+## Testing
+
+Unit tests use Vitest. Tests are colocated with source files (`*.test.ts`).
+
+```bash
+# Run all tests
+npm run test
+
+# Run tests for a specific package
+cd packages/results-store && npm test
+cd packages/cli && npm test
+```
+
+**Tested modules**:
+- `packages/results-store/src/comparison.ts` - `compareResults()`, `calculateDiff()`, formatting utilities
+- `packages/results-store/src/storage.ts` - `ResultsStorage` class (save, load, delete, rebuildIndex)
+- `packages/cli/src/utils.ts` - `parseArgs()`, `expandPath()`, `formatDuration()`
 
 ## Environment Variables
 
