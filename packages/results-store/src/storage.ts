@@ -117,6 +117,63 @@ export class ResultsStorage {
     return results;
   }
 
+  async loadByLabelAndConfig(
+    label: string,
+    app?: string,
+    scenario?: string,
+    mode?: string
+  ): Promise<StoredBenchmark[]> {
+    const index = await this.loadIndex();
+    const entries = index.filter((e) => {
+      if (e.label !== label) return false;
+      if (app && e.app !== app) return false;
+      if (scenario && e.scenario !== scenario) return false;
+      if (mode && e.mode !== mode) return false;
+      return true;
+    });
+
+    const results: StoredBenchmark[] = [];
+    for (const entry of entries) {
+      try {
+        const content = await fs.readFile(entry.filepath, 'utf-8');
+        results.push(JSON.parse(content));
+      } catch {
+        // Skip files that can't be read
+      }
+    }
+
+    return results;
+  }
+
+  async findMatchingPairs(
+    baselineLabel: string,
+    targetLabel: string,
+    app?: string,
+    scenario?: string,
+    mode?: string
+  ): Promise<Array<{ baseline: StoredBenchmark; target: StoredBenchmark }>> {
+    const baselineResults = await this.loadByLabelAndConfig(baselineLabel, app, scenario, mode);
+    const targetResults = await this.loadByLabelAndConfig(targetLabel, app, scenario, mode);
+
+    const pairs: Array<{ baseline: StoredBenchmark; target: StoredBenchmark }> = [];
+
+    for (const baseline of baselineResults) {
+      const { app: bApp, scenario: bScenario, mode: bMode } = baseline.metadata.config;
+      const matchingTarget = targetResults.find(
+        (t) =>
+          t.metadata.config.app === bApp &&
+          t.metadata.config.scenario === bScenario &&
+          t.metadata.config.mode === bMode
+      );
+
+      if (matchingTarget) {
+        pairs.push({ baseline, target: matchingTarget });
+      }
+    }
+
+    return pairs;
+  }
+
   async list(): Promise<IndexEntry[]> {
     return this.loadIndex();
   }

@@ -69,7 +69,7 @@ jobs:
             MODES=$(echo '${{ inputs.modes }}' | jq -R 'split(",") | map(gsub("^\\s+|\\s+$";""))')
           fi
 
-          # Matrix without type - used by both benchmark jobs
+          # Matrix without type - used by benchmark jobs
           MATRIX="{\"app\": $APPS, \"mode\": $MODES}"
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
           echo "Matrix: $MATRIX"
@@ -148,11 +148,12 @@ jobs:
             package-lock.json
           retention-days: 1
 
-  # Run baseline benchmarks (starts as soon as build-baseline completes)
-  benchmark-baseline:
-    needs: [setup, build-baseline]
+  # Run both baseline and PR benchmarks on the same runner for fair comparison
+  # This eliminates VM-to-VM performance variance
+  benchmark:
+    needs: [setup, build-baseline, build-pr]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
@@ -181,90 +182,57 @@ jobs:
       - name: Build perf-experiments
         run: npm run build
 
-      - name: Download built otel-js
+      # Download both baseline and PR builds
+      - name: Download baseline otel-js
         uses: actions/download-artifact@v4
         with:
           name: otel-js-baseline
-          path: opentelemetry-js/
+          path: otel-baseline/
 
-      - name: Run benchmark
+      - name: Download PR otel-js
+        uses: actions/download-artifact@v4
+        with:
+          name: otel-js-pr
+          path: otel-pr/
+
+      # Run baseline benchmark first
+      - name: Run baseline benchmark
         run: |
+          echo "::group::Running baseline benchmark (${{ matrix.app }}/${{ matrix.mode }})"
           npm run cli -- run \
             --app ${{ matrix.app }} \
             --mode ${{ matrix.mode }} \
             --scenario ${{ inputs.scenarios }} \
             --preset ${{ inputs.preset }} \
             --label "baseline-${{ needs.setup.outputs.baseline_tag }}" \
-            --otel-path ./opentelemetry-js \
+            --otel-path ./otel-baseline \
             --save
+          echo "::endgroup::"
 
-      - name: Upload results
-        uses: actions/upload-artifact@v4
-        with:
-          name: results-baseline-${{ matrix.app }}-${{ matrix.mode }}
-          path: results/
-          retention-days: 1
-
-  # Run PR benchmarks (starts as soon as build-pr completes)
-  benchmark-pr:
-    needs: [setup, build-pr]
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
-    steps:
-      - name: Checkout performance experiments repo
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: 'npm'
-
-      - name: Cache Turborepo
-        uses: actions/cache@v4
-        with:
-          path: .turbo
-          key: turbo-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-${{ github.sha }}
-          restore-keys: |
-            turbo-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
-            turbo-${{ runner.os }}-
-
-      - name: Install perf-experiments dependencies
-        run: npm ci
-
-      - name: Build perf-experiments
-        run: npm run build
-
-      - name: Download built otel-js
-        uses: actions/download-artifact@v4
-        with:
-          name: otel-js-pr
-          path: opentelemetry-js/
-
-      - name: Run benchmark
+      # Run PR benchmark on the same runner for fair comparison
+      - name: Run PR benchmark
         run: |
+          echo "::group::Running PR benchmark (${{ matrix.app }}/${{ matrix.mode }})"
           npm run cli -- run \
             --app ${{ matrix.app }} \
             --mode ${{ matrix.mode }} \
             --scenario ${{ inputs.scenarios }} \
             --preset ${{ inputs.preset }} \
             --label "pr-${{ inputs.pr_number }}" \
-            --otel-path ./opentelemetry-js \
+            --otel-path ./otel-pr \
             --save
+          echo "::endgroup::"
 
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
-          name: results-pr-${{ matrix.app }}-${{ matrix.mode }}
+          name: results-${{ matrix.app }}-${{ matrix.mode }}
           path: results/
           retention-days: 1
 
   # Compare results and create report
   compare:
-    needs: [setup, benchmark-baseline, benchmark-pr]
+    needs: [setup, benchmark]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

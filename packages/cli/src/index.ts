@@ -39,6 +39,9 @@ Compare Options:
   --baseline <id>     Baseline result ID or label
   --target <id>       Target result ID or label
   --format <type>     Output format (table, json, markdown) [default: table]
+  --app <name>        Filter by app (express, fastify)
+  --scenario <name>   Filter by scenario
+  --mode <name>       Filter by instrumentation mode
 
 Export Options:
   --id <id>           Result ID to export
