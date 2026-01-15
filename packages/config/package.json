@@ -1,0 +1,20 @@
+{
+  "name": "@otel-perf/config",
+  "version": "1.0.0",
+  "description": "Shared configuration for OTel performance benchmarks",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

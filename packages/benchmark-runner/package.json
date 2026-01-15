@@ -17,6 +17,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@otel-perf/config": "*",
     "autocannon": "^8.0.0"
   },
   "devDependencies": {

@@ -78,6 +78,12 @@ export const SCENARIOS: TestScenario[] = [
     method: 'GET',
   },
   {
+    name: 'complex-attributes',
+    description: 'Spans with complex attributes (arrays, nested objects) for toAnyValue benchmarking',
+    endpoint: '/api/spans/complex-attributes',
+    method: 'GET',
+  },
+  {
     name: 'post-json-small',
     description: 'POST with small JSON body',
     endpoint: '/api/data',
@@ -118,3 +124,30 @@ export const INSTRUMENTATION_MODES: InstrumentationMode[] = [
     },
   },
 ];
+
+export const BENCHMARK_PRESETS: Record<string, BenchmarkPreset> = {
+  quick: {
+    connections: 10,
+    duration: 10,
+    pipelining: 1,
+    warmup: { duration: 3, connections: 5 },
+  },
+  standard: {
+    connections: 50,
+    duration: 30,
+    pipelining: 1,
+    warmup: { duration: 5, connections: 10 },
+  },
+  stress: {
+    connections: 100,
+    duration: 60,
+    pipelining: 1,
+    warmup: { duration: 10, connections: 20 },
+  },
+  sustained: {
+    connections: 25,
+    duration: 300,
+    pipelining: 1,
+    warmup: { duration: 10, connections: 10 },
+  },
+};

@@ -2,6 +2,9 @@ import autocannon, { Result } from 'autocannon';
 import { EventEmitter } from 'events';
 import type { BenchmarkConfig, BenchmarkResult, BenchmarkEventType } from './types.js';
 
+// Re-export from shared config for backwards compatibility
+export { BENCHMARK_PRESETS } from '@otel-perf/config';
+
 export const DEFAULT_CONFIG: Partial<BenchmarkConfig> = {
   connections: 10,
   pipelining: 1,
@@ -138,29 +141,3 @@ export class AutocannonBenchmark extends EventEmitter {
   }
 }
 
-export const BENCHMARK_PRESETS = {
-  quick: {
-    connections: 10,
-    duration: 10,
-    pipelining: 1,
-    warmup: { duration: 3, connections: 5 },
-  },
-  standard: {
-    connections: 50,
-    duration: 30,
-    pipelining: 1,
-    warmup: { duration: 5, connections: 10 },
-  },
-  stress: {
-    connections: 100,
-    duration: 60,
-    pipelining: 1,
-    warmup: { duration: 10, connections: 20 },
-  },
-  sustained: {
-    connections: 25,
-    duration: 300,
-    pipelining: 1,
-    warmup: { duration: 10, connections: 10 },
-  },
-} as const;

@@ -5,7 +5,7 @@ import { BenchmarkRunner, BENCHMARK_PRESETS } from '@otel-perf/benchmark-runner'
 import { ResultsStorage } from '@otel-perf/results-store';
 import { GitOperations } from '@otel-perf/otel-linker';
 import { parseArgs, getDefaultOtelPath, expandPath, getProjectRoot } from '../utils.js';
-import { SCENARIOS, INSTRUMENTATION_MODES } from '../config/scenarios.js';
+import { SCENARIOS, INSTRUMENTATION_MODES } from '@otel-perf/config';
 
 interface RunOptions {
   app: string;

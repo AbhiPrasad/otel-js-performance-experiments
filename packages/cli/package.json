@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@otel-perf/benchmark-runner": "*",
+    "@otel-perf/config": "*",
     "@otel-perf/otel-linker": "*",
     "@otel-perf/results-store": "*",
     "@otel-perf/github-reporter": "*",
