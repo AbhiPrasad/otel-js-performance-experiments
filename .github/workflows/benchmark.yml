@@ -327,14 +327,10 @@ jobs:
             const fs = require('fs');
             const comparison = fs.readFileSync('comparison.md', 'utf8');
 
-            const title = `Performance Benchmark: PR #${{ inputs.pr_number }} vs ${{ needs.setup.outputs.baseline_tag }}`;
-            const body = `${comparison}
-
----
-
-[View full benchmark artifacts](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-
-Related PR: open-telemetry/opentelemetry-js#${{ inputs.pr_number }}`;
+            const title = 'Performance Benchmark: PR #${{ inputs.pr_number }} vs ${{ needs.setup.outputs.baseline_tag }}';
+            const body = comparison + '\n\n---\n\n' +
+              '[View full benchmark artifacts](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})\n\n' +
+              'Related PR: open-telemetry/opentelemetry-js#${{ inputs.pr_number }}';
 
             const issue = await github.rest.issues.create({
               owner: context.repo.owner,
@@ -344,7 +340,7 @@ Related PR: open-telemetry/opentelemetry-js#${{ inputs.pr_number }}`;
               labels: ['performance', 'benchmark']
             });
 
-            core.notice(`Created issue #${issue.data.number}: ${issue.data.html_url}`);
+            core.notice('Created issue #' + issue.data.number + ': ' + issue.data.html_url);
 
       - name: Print summary
         run: |
