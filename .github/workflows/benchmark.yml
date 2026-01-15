@@ -311,6 +311,21 @@ jobs:
             --format markdown > comparison.md
           cat comparison.md
 
+      - name: Create issue file
+        run: |
+          echo '---' > issue.md
+          echo 'title: "Performance Benchmark: PR #${{ inputs.pr_number }} vs ${{ needs.setup.outputs.baseline_tag }}"' >> issue.md
+          echo 'labels: performance, benchmark' >> issue.md
+          echo '---' >> issue.md
+          echo '' >> issue.md
+          cat comparison.md >> issue.md
+          echo '' >> issue.md
+          echo '---' >> issue.md
+          echo '' >> issue.md
+          echo '[View full benchmark artifacts](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})' >> issue.md
+          echo '' >> issue.md
+          echo 'Related PR: open-telemetry/opentelemetry-js#${{ inputs.pr_number }}' >> issue.md
+
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
         with:
@@ -318,21 +333,13 @@ jobs:
           path: |
             results/
             comparison.md
+            issue.md
           retention-days: 90
 
       - name: Create GitHub Issue with results
-        if: success()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          npm run cli -- report \
-            --baseline "baseline-${{ needs.setup.outputs.baseline_tag }}" \
-            --target "pr-${{ inputs.pr_number }}" \
-            --create-issue \
-            --pr ${{ inputs.pr_number }} \
-            --artifact-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --owner "${{ github.repository_owner }}" \
-            --repo "${{ github.event.repository.name }}"
+        uses: peter-evans/create-issue-from-file@v5
+        with:
+          content-filepath: ./issue.md
 
       - name: Print summary
         run: |
