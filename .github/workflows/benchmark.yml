@@ -80,32 +80,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Check cache for built otel-js baseline
-        id: cache-otel
-        uses: actions/cache@v4
-        with:
-          path: otel-js-built/
-          key: otel-js-baseline-${{ needs.setup.outputs.baseline_tag }}-node24-v1
-
       - name: Checkout opentelemetry-js repo
-        if: steps.cache-otel.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
           repository: open-telemetry/opentelemetry-js
           ref: ${{ needs.setup.outputs.baseline_tag }}
-          path: otel-js-built/
 
       - name: Setup Node.js
-        if: steps.cache-otel.outputs.cache-hit != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: 'npm'
-          cache-dependency-path: otel-js-built/package-lock.json
 
       - name: Install and build otel-js
-        if: steps.cache-otel.outputs.cache-hit != 'true'
-        working-directory: otel-js-built/
         run: |
           npm ci
           npm run compile
@@ -115,13 +102,13 @@ jobs:
         with:
           name: otel-js-baseline
           path: |
-            otel-js-built/packages/*/build/
-            otel-js-built/packages/*/dist/
-            otel-js-built/experimental/packages/*/build/
-            otel-js-built/experimental/packages/*/dist/
-            otel-js-built/node_modules/
-            otel-js-built/package.json
-            otel-js-built/package-lock.json
+            packages/*/build/
+            packages/*/dist/
+            experimental/packages/*/build/
+            experimental/packages/*/dist/
+            node_modules/
+            package.json
+            package-lock.json
           retention-days: 1
 
   # Build PR otel-js
