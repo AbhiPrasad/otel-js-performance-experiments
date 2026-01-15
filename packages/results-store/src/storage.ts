@@ -56,7 +56,7 @@ export class ResultsStorage {
 
     const benchmark: StoredBenchmark = { metadata, results };
 
-    const filename = `${timestamp.replace(/[:.]/g, '-')}_${label.replace(/[^a-zA-Z0-9-]/g, '_')}.json`;
+    const filename = `${timestamp.replace(/[:.]/g, '-')}_${label.replace(/[^a-zA-Z0-9-]/g, '_')}_${id}.json`;
     const filepath = path.join(this.resultsDir, 'benchmarks', filename);
 
     await fs.writeFile(filepath, JSON.stringify(benchmark, null, 2));
