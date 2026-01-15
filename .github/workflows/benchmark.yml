@@ -1,6 +1,10 @@
 name: Performance Benchmark
 run-name: "Benchmark PR #${{ inputs.pr_number }} (${{ inputs.preset }})"
 
+permissions:
+  contents: read
+  issues: write
+
 on:
   workflow_dispatch:
     inputs:
